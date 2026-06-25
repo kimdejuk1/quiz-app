@@ -148,14 +148,47 @@
         return;
       }
 
+      // 정답이 설정된 문제만 채점
+      const gradable = problems.filter(p => p.answer !== null);
+      const correct = gradable.filter(p => parseInt(answers[p.id]) === p.answer);
+      const hasAnswers = gradable.length > 0;
+
+      const resultRows = problems.map((p, i) => {
+        const myAns = answers[p.id] ?? '-';
+        const hasCorrect = p.answer !== null;
+        const isCorrect = hasCorrect && parseInt(myAns) === p.answer;
+        const icon = !hasCorrect ? '' : isCorrect ? '✅' : '❌';
+        const correctText = hasCorrect ? `<span style="color:#6b7280;font-size:0.8rem;">정답: ${p.answer}번</span>` : '';
+        const bg = !hasCorrect ? '#f9fafb' : isCorrect ? '#d1fae5' : '#fee2e2';
+        return `
+          <div style="display:flex; align-items:center; gap:12px; padding:10px 14px;
+                      border-radius:8px; background:${bg}; margin-bottom:8px;">
+            <span style="font-weight:700; min-width:60px;">문제 ${i+1}</span>
+            <span>내 답: <strong>${myAns}번</strong></span>
+            ${correctText}
+            <span style="margin-left:auto; font-size:1.2rem;">${icon}</span>
+          </div>`;
+      }).join('');
+
+      const scoreHtml = hasAnswers
+        ? `<p style="font-size:1.1rem; font-weight:700; color:#1a56db; margin:12px 0;">
+             ${correct.length} / ${gradable.length} 정답
+           </p>`
+        : `<p style="color:#6b7280; margin:12px 0;">교사가 정답을 설정하지 않아 채점 결과를 표시할 수 없습니다.</p>`;
+
       document.getElementById('examPaper').innerHTML = `
-        <div style="text-align:center; padding: 60px 0;">
-          <div style="font-size:3rem; margin-bottom:16px;">✅</div>
-          <h2 style="color:#065f46; margin-bottom:8px;">제출 완료!</h2>
-          <p style="color:#6b7280;">${studentName}님의 답안이 제출되었습니다.</p>
-          <button class="btn btn-secondary" style="margin-top:24px; width:auto" onclick="location.href='index.html'">
-            처음으로 돌아가기
-          </button>
+        <div style="padding: 24px 0;">
+          <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:2.5rem; margin-bottom:8px;">${hasAnswers ? (correct.length === gradable.length ? '🎉' : '📝') : '✅'}</div>
+            <h2 style="margin-bottom:4px;">${studentName}님 제출 완료!</h2>
+            ${scoreHtml}
+          </div>
+          <div>${resultRows}</div>
+          <div style="text-align:center; margin-top:24px;">
+            <button class="btn btn-secondary" style="width:auto" onclick="location.href='index.html'">
+              처음으로 돌아가기
+            </button>
+          </div>
         </div>
       `;
       document.querySelector('.quiz-nav').style.display = 'none';

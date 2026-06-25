@@ -142,10 +142,11 @@ input:focus, select:focus { border-color: #1a56db; }
 }
 .problem-img {
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: 3/2;
   object-fit: contain;
   background: #f9fafb;
   display: block;
+  min-height: 260px;
 }
 .problem-choices {
   display: flex;
