@@ -11,7 +11,7 @@
 <body>
   <header>
     <h1>📝 온라인 시험</h1>
-    <span class="sub">문제를 선택하여 시작하세요</span>
+    <span class="sub">선생님과 단원을 선택하세요</span>
   </header>
 
   <div class="card">
@@ -23,8 +23,20 @@
       <input type="text" id="studentName" placeholder="이름을 입력하세요" maxlength="20">
     </div>
 
-    <div class="form-group">
-      <label>단원 선택</label>
+    <!-- Step 1: 선생님 선택 -->
+    <div class="form-group" id="teacherStep">
+      <label>선생님 선택</label>
+      <div id="teacherList" class="unit-list">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: 단원 선택 (선생님 선택 후 표시) -->
+    <div class="form-group" id="unitStep" style="display:none">
+      <label>
+        <button onclick="backToTeacher()" style="background:none;border:none;color:#1a56db;cursor:pointer;font-size:0.85rem;padding:0;margin-right:6px;">← 다시 선택</button>
+        단원 선택 <span id="selectedTeacherName" style="color:#6b7280;font-weight:400;"></span>
+      </label>
       <div id="unitList" class="unit-list">
         <div class="spinner"></div>
       </div>
@@ -34,26 +46,56 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/config.js"></script>
   <script>
-    async function loadUnits() {
+    let selectedTeacherId = null;
+
+    async function loadTeachers() {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .order('display_name');
+
+      const list = document.getElementById('teacherList');
+
+      if (error || !data?.length) {
+        list.innerHTML = '<p class="empty">등록된 선생님이 없습니다.</p>';
+        return;
+      }
+
+      list.innerHTML = data.map(t => `
+        <button class="unit-btn" onclick="selectTeacher('${t.id}', '${t.display_name.replace(/'/g, "\\'")}')">
+          👨‍🏫 ${t.display_name}
+        </button>
+      `).join('');
+    }
+
+    async function selectTeacher(teacherId, teacherName) {
+      const name = document.getElementById('studentName').value.trim();
+      if (!name) {
+        showMsg('이름을 먼저 입력해주세요.', 'error');
+        document.getElementById('studentName').focus();
+        return;
+      }
+
+      selectedTeacherId = teacherId;
+      document.getElementById('selectedTeacherName').textContent = `— ${teacherName}`;
+      document.getElementById('teacherStep').style.display = 'none';
+      document.getElementById('unitStep').style.display = '';
+      document.getElementById('unitList').innerHTML = '<div class="spinner"></div>';
+
       const { data, error } = await supabase
         .from('problems')
         .select('unit')
+        .eq('teacher_id', teacherId)
         .order('unit');
 
-      if (error) {
-        showMsg('단원 목록을 불러오지 못했습니다.', 'error');
-        document.getElementById('unitList').innerHTML = '';
+      const list = document.getElementById('unitList');
+
+      if (error || !data?.length) {
+        list.innerHTML = '<p class="empty">등록된 문제가 없습니다.</p>';
         return;
       }
 
       const units = [...new Set(data.map(r => r.unit))];
-      const list = document.getElementById('unitList');
-
-      if (units.length === 0) {
-        list.innerHTML = '<p class="empty">등록된 문제가 없습니다.<br>교사 페이지에서 문제를 업로드해주세요.</p>';
-        return;
-      }
-
       list.innerHTML = units.map(u => `
         <button class="unit-btn" onclick="startQuiz('${u.replace(/'/g, "\\'")}')">
           📖 ${u}
@@ -61,15 +103,21 @@
       `).join('');
     }
 
+    function backToTeacher() {
+      selectedTeacherId = null;
+      document.getElementById('unitStep').style.display = 'none';
+      document.getElementById('teacherStep').style.display = '';
+    }
+
     function startQuiz(unit) {
       const name = document.getElementById('studentName').value.trim();
       if (!name) {
         showMsg('이름을 입력해주세요.', 'error');
-        document.getElementById('studentName').focus();
         return;
       }
       sessionStorage.setItem('studentName', name);
       sessionStorage.setItem('selectedUnit', unit);
+      sessionStorage.setItem('teacherId', selectedTeacherId);
       location.href = 'quiz.html';
     }
 
@@ -79,7 +127,7 @@
       el.className = `msg ${type} show`;
     }
 
-    loadUnits();
+    loadTeachers();
   </script>
 </body>
 </html>

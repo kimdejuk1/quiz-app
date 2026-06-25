@@ -38,8 +38,9 @@
   <script>
     const studentName = sessionStorage.getItem('studentName');
     const unit = sessionStorage.getItem('selectedUnit');
+    const teacherId = sessionStorage.getItem('teacherId');
 
-    if (!studentName || !unit) location.href = 'index.html';
+    if (!studentName || !unit || !teacherId) location.href = 'index.html';
 
     document.getElementById('headerInfo').textContent = `${studentName} | ${unit}`;
 
@@ -53,6 +54,7 @@
         .from('problems')
         .select('*')
         .eq('unit', unit)
+        .eq('teacher_id', teacherId)
         .order('order_number');
 
       if (error || !data.length) {
@@ -139,6 +141,7 @@
         student_name: studentName,
         unit: unit,
         answers: answers,
+        teacher_id: teacherId,
       });
 
       if (error) {

@@ -51,6 +51,18 @@
     </p>
   </div>
 
+  <!-- 프로필 설정 (최초 로그인 시) -->
+  <div class="card" id="profileSection" style="display:none">
+    <h2>선생님 이름 설정</h2>
+    <p style="color:#6b7280; font-size:0.88rem; margin-bottom:16px;">학생 화면에 표시될 선생님 이름을 입력해주세요.</p>
+    <div id="profileMsg" class="msg"></div>
+    <div class="form-group">
+      <label>이름 (예: 홍길동 선생님)</label>
+      <input type="text" id="profileName" placeholder="표시될 이름 입력" maxlength="20">
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()">저장하고 시작하기</button>
+  </div>
+
   <!-- 대시보드 -->
   <div class="teacher-layout" id="dashboard" style="display:none">
     <div id="dashMsg" class="msg"></div>
@@ -148,12 +160,34 @@
       document.getElementById('headerEmail').textContent = '';
     }
 
-    function showDashboard(user) {
+    async function showDashboard(user) {
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('signupSection').style.display = 'none';
-      document.getElementById('dashboard').style.display = '';
       document.getElementById('btnLogout').style.display = '';
       document.getElementById('headerEmail').textContent = user.email;
+
+      // 프로필(이름) 확인 — 없으면 이름 설정 화면 표시
+      const { data: profile } = await supabase
+        .from('profiles').select('display_name').eq('id', user.id).single();
+
+      if (!profile) {
+        document.getElementById('profileSection').style.display = '';
+      } else {
+        document.getElementById('profileSection').style.display = 'none';
+        document.getElementById('dashboard').style.display = '';
+        loadUnitFilters();
+        loadProblems();
+      }
+    }
+
+    async function saveProfile() {
+      const name = document.getElementById('profileName').value.trim();
+      if (!name) { showMsg('profileMsg', '이름을 입력해주세요.', 'error'); return; }
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: name });
+      if (error) { showMsg('profileMsg', '저장 실패: ' + error.message, 'error'); return; }
+      document.getElementById('profileSection').style.display = 'none';
+      document.getElementById('dashboard').style.display = '';
       loadUnitFilters();
       loadProblems();
     }
@@ -241,11 +275,15 @@
       prog.style.display = '';
       document.getElementById('btnUpload').disabled = true;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      const teacherId = user.id;
+
       // 현재 해당 단원 최대 order_number 조회
       const { data: existing } = await supabase
         .from('problems')
         .select('order_number')
         .eq('unit', unit)
+        .eq('teacher_id', teacherId)
         .order('order_number', { ascending: false })
         .limit(1);
 
@@ -270,6 +308,7 @@
           image_url: urlData.publicUrl,
           order_number: nextOrder++,
           answer: null,
+          teacher_id: teacherId,
         });
 
         done++;
@@ -288,7 +327,8 @@
 
     // ── 문제 관리 ──────────────────────────
     async function loadUnitFilters() {
-      const { data } = await supabase.from('problems').select('unit').order('unit');
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data } = await supabase.from('problems').select('unit').eq('teacher_id', user.id).order('unit');
       const units = [...new Set((data || []).map(r => r.unit))];
 
       ['filterUnit', 'filterSubmUnit'].forEach(id => {
@@ -300,8 +340,9 @@
     }
 
     async function loadProblems() {
+      const { data: { user } } = await supabase.auth.getUser();
       const unit = document.getElementById('filterUnit').value;
-      let query = supabase.from('problems').select('*').order('unit').order('order_number');
+      let query = supabase.from('problems').select('*').eq('teacher_id', user.id).order('unit').order('order_number');
       if (unit) query = query.eq('unit', unit);
 
       const { data, error } = await query;
@@ -376,7 +417,8 @@
     // ── 답안 확인 ──────────────────────────
     async function loadSubmissions() {
       const unit = document.getElementById('filterSubmUnit').value;
-      let query = supabase.from('submissions').select('*').order('submitted_at', { ascending: false });
+      const { data: { user } } = await supabase.auth.getUser();
+      let query = supabase.from('submissions').select('*').eq('teacher_id', user.id).order('submitted_at', { ascending: false });
       if (unit) query = query.eq('unit', unit);
 
       const { data, error } = await query;
@@ -391,6 +433,7 @@
       const units = [...new Set(data.map(s => s.unit))];
       const { data: problems } = await supabase.from('problems')
         .select('id, unit, order_number, answer')
+        .eq('teacher_id', user.id)
         .in('unit', units)
         .order('order_number');
 
