@@ -408,9 +408,9 @@
           return `<span class="answer-chip"><span class="q">${i+1}번</span> <span class="a">${studentAns}</span>${correct}</span>`;
         }).join('');
 
-        const score = p.answer
-          ? `(${probs.filter(p => parseInt(s.answers[p.id]) === p.answer).length}/${probs.filter(p=>p.answer).length}점)`
-          : '';
+        const gradable = probs.filter(p => p.answer !== null);
+        const correctCount = gradable.filter(p => parseInt(s.answers[p.id]) === p.answer).length;
+        const score = gradable.length > 0 ? `(${correctCount}/${gradable.length}점)` : '';
 
         return `
           <div class="submission-card">
