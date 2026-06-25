@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>교사 대시보드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎓 교사 대시보드</h1>
+    <span class="sub" id="headerEmail"></span>
+    <button class="btn btn-secondary btn-sm" id="btnLogout" onclick="logout()" style="display:none">로그아웃</button>
+  </header>
+
+  <!-- 로그인 화면 -->
+  <div class="card" id="loginSection">
+    <h2>교사 로그인</h2>
+    <div id="loginMsg" class="msg"></div>
+    <div class="form-group">
+      <label>이메일</label>
+      <input type="email" id="loginEmail" placeholder="teacher@example.com">
+    </div>
+    <div class="form-group">
+      <label>비밀번호</label>
+      <input type="password" id="loginPassword" placeholder="비밀번호">
+    </div>
+    <button class="btn btn-primary" onclick="login()">로그인</button>
+    <p style="text-align:center; margin-top:14px; font-size:0.82rem; color:#6b7280;">
+      계정이 없으신가요? <a href="#" onclick="showSignup()" style="color:#1a56db;">회원가입</a>
+    </p>
+  </div>
+
+  <!-- 회원가입 화면 -->
+  <div class="card" id="signupSection" style="display:none">
+    <h2>교사 계정 만들기</h2>
+    <div id="signupMsg" class="msg"></div>
+    <div class="form-group">
+      <label>이메일</label>
+      <input type="email" id="signupEmail" placeholder="teacher@example.com">
+    </div>
+    <div class="form-group">
+      <label>비밀번호 (6자 이상)</label>
+      <input type="password" id="signupPassword" placeholder="비밀번호">
+    </div>
+    <button class="btn btn-primary" onclick="signup()">계정 만들기</button>
+    <p style="text-align:center; margin-top:14px; font-size:0.82rem; color:#6b7280;">
+      이미 계정이 있으신가요? <a href="#" onclick="showLogin()" style="color:#1a56db;">로그인</a>
+    </p>
+  </div>
+
+  <!-- 대시보드 -->
+  <div class="teacher-layout" id="dashboard" style="display:none">
+    <div id="dashMsg" class="msg"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('upload')">📤 문제 업로드</button>
+      <button class="tab-btn" onclick="switchTab('problems')">📋 문제 관리</button>
+      <button class="tab-btn" onclick="switchTab('submissions')">📊 답안 확인</button>
+    </div>
+
+    <!-- ── 탭 1: 업로드 ── -->
+    <div class="tab-panel active" id="tab-upload">
+      <div class="form-group">
+        <label>단원명</label>
+        <div class="input-row">
+          <div class="form-group" style="flex:1; margin-bottom:0">
+            <input type="text" id="uploadUnit" placeholder="예) 1단원: 힘과 운동" style="margin-bottom:0">
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+        ondragover="event.preventDefault(); this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDrop(event)">
+        <div class="icon">📁</div>
+        <strong>클릭하거나 파일을 드래그하세요</strong>
+        <p>PNG, JPG, GIF, WEBP 지원 · 한 번에 여러 파일 선택 가능</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="handleFiles(this.files)">
+
+      <div class="preview-grid" id="previewGrid"></div>
+
+      <div id="uploadProgress" style="display:none; margin-bottom:12px;">
+        <div class="progress-bar" style="margin-bottom:6px">
+          <div class="progress-fill" id="uploadProgressFill" style="width:0%"></div>
+        </div>
+        <p style="font-size:0.82rem; color:#6b7280;" id="uploadProgressText">업로드 중...</p>
+      </div>
+
+      <button class="btn btn-primary" onclick="uploadFiles()" id="btnUpload" style="display:none">
+        업로드하기
+      </button>
+    </div>
+
+    <!-- ── 탭 2: 문제 관리 ── -->
+    <div class="tab-panel" id="tab-problems">
+      <div class="form-group" style="max-width:280px">
+        <label>단원 필터</label>
+        <select id="filterUnit" onchange="loadProblems()">
+          <option value="">전체</option>
+        </select>
+      </div>
+
+      <div id="problemsContent">
+        <div class="spinner"></div>
+      </div>
+
+      <div style="margin-top:16px; text-align:right">
+        <button class="btn btn-primary btn-sm" onclick="saveAnswers()">정답 저장</button>
+      </div>
+    </div>
+
+    <!-- ── 탭 3: 답안 확인 ── -->
+    <div class="tab-panel" id="tab-submissions">
+      <div class="form-group" style="max-width:280px">
+        <label>단원 필터</label>
+        <select id="filterSubmUnit" onchange="loadSubmissions()">
+          <option value="">전체</option>
+        </select>
+      </div>
+
+      <div id="submissionsContent">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script>
+    let pendingFiles = [];
+
+    // ── 인증 ──────────────────────────────
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) showDashboard(session.user);
+      else showLoginForm();
+    });
+
+    function showLoginForm() {
+      document.getElementById('loginSection').style.display = '';
+      document.getElementById('signupSection').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('btnLogout').style.display = 'none';
+      document.getElementById('headerEmail').textContent = '';
+    }
+
+    function showDashboard(user) {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('signupSection').style.display = 'none';
+      document.getElementById('dashboard').style.display = '';
+      document.getElementById('btnLogout').style.display = '';
+      document.getElementById('headerEmail').textContent = user.email;
+      loadUnitFilters();
+      loadProblems();
+    }
+
+    async function login() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) showMsg('loginMsg', error.message, 'error');
+    }
+
+    async function signup() {
+      const email = document.getElementById('signupEmail').value.trim();
+      const password = document.getElementById('signupPassword').value;
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) { showMsg('signupMsg', error.message, 'error'); return; }
+      showMsg('signupMsg', '가입 완료! 이메일 확인 후 로그인하세요.', 'success');
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+    }
+
+    function showSignup() {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('signupSection').style.display = '';
+    }
+    function showLogin() {
+      document.getElementById('signupSection').style.display = 'none';
+      document.getElementById('loginSection').style.display = '';
+    }
+
+    // ── 탭 전환 ────────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['upload','problems','submissions'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'problems') loadProblems();
+      if (name === 'submissions') loadSubmissions();
+    }
+
+    // ── 업로드 ─────────────────────────────
+    function handleDrop(e) {
+      e.preventDefault();
+      document.getElementById('uploadZone').classList.remove('drag-over');
+      handleFiles(e.dataTransfer.files);
+    }
+
+    function handleFiles(files) {
+      for (const f of files) {
+        if (!f.type.startsWith('image/')) continue;
+        pendingFiles.push(f);
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const div = document.createElement('div');
+          div.className = 'preview-item';
+          div.dataset.name = f.name;
+          div.innerHTML = `
+            <img src="${ev.target.result}" alt="${f.name}">
+            <button class="remove-btn" onclick="removePending('${f.name}', this.parentElement)">✕</button>
+          `;
+          document.getElementById('previewGrid').appendChild(div);
+        };
+        reader.readAsDataURL(f);
+      }
+      document.getElementById('btnUpload').style.display = pendingFiles.length ? '' : 'none';
+    }
+
+    function removePending(name, el) {
+      pendingFiles = pendingFiles.filter(f => f.name !== name);
+      el.remove();
+      document.getElementById('btnUpload').style.display = pendingFiles.length ? '' : 'none';
+    }
+
+    async function uploadFiles() {
+      const unit = document.getElementById('uploadUnit').value.trim();
+      if (!unit) { showMsg('dashMsg', '단원명을 입력하세요.', 'error'); return; }
+      if (!pendingFiles.length) { showMsg('dashMsg', '업로드할 파일을 선택하세요.', 'error'); return; }
+
+      const prog = document.getElementById('uploadProgress');
+      const fill = document.getElementById('uploadProgressFill');
+      const text = document.getElementById('uploadProgressText');
+      prog.style.display = '';
+      document.getElementById('btnUpload').disabled = true;
+
+      // 현재 해당 단원 최대 order_number 조회
+      const { data: existing } = await supabase
+        .from('problems')
+        .select('order_number')
+        .eq('unit', unit)
+        .order('order_number', { ascending: false })
+        .limit(1);
+
+      let nextOrder = existing && existing.length ? existing[0].order_number + 1 : 1;
+      let done = 0;
+
+      for (const file of pendingFiles) {
+        const ext = file.name.split('.').pop();
+        const path = `${unit}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+        const { error: upErr } = await supabase.storage
+          .from('problem-images')
+          .upload(path, file, { upsert: false });
+
+        if (upErr) { showMsg('dashMsg', `${file.name} 업로드 실패: ${upErr.message}`, 'error'); continue; }
+
+        const { data: urlData } = supabase.storage.from('problem-images').getPublicUrl(path);
+
+        await supabase.from('problems').insert({
+          unit,
+          image_url: urlData.publicUrl,
+          order_number: nextOrder++,
+          answer: null,
+        });
+
+        done++;
+        fill.style.width = `${(done / pendingFiles.length) * 100}%`;
+        text.textContent = `${done} / ${pendingFiles.length} 완료`;
+      }
+
+      prog.style.display = 'none';
+      document.getElementById('btnUpload').disabled = false;
+      pendingFiles = [];
+      document.getElementById('previewGrid').innerHTML = '';
+      document.getElementById('btnUpload').style.display = 'none';
+      showMsg('dashMsg', `${done}개 문제가 업로드되었습니다.`, 'success');
+      loadUnitFilters();
+    }
+
+    // ── 문제 관리 ──────────────────────────
+    async function loadUnitFilters() {
+      const { data } = await supabase.from('problems').select('unit').order('unit');
+      const units = [...new Set((data || []).map(r => r.unit))];
+
+      ['filterUnit', 'filterSubmUnit'].forEach(id => {
+        const sel = document.getElementById(id);
+        const val = sel.value;
+        sel.innerHTML = '<option value="">전체</option>' +
+          units.map(u => `<option value="${u}" ${u === val ? 'selected' : ''}>${u}</option>`).join('');
+      });
+    }
+
+    async function loadProblems() {
+      const unit = document.getElementById('filterUnit').value;
+      let query = supabase.from('problems').select('*').order('unit').order('order_number');
+      if (unit) query = query.eq('unit', unit);
+
+      const { data, error } = await query;
+      const el = document.getElementById('problemsContent');
+
+      if (error || !data.length) {
+        el.innerHTML = '<p class="empty">등록된 문제가 없습니다.</p>';
+        return;
+      }
+
+      el.innerHTML = `
+        <table class="problem-table">
+          <thead>
+            <tr>
+              <th>순서</th>
+              <th>미리보기</th>
+              <th>단원</th>
+              <th>정답</th>
+              <th>삭제</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(p => `
+              <tr data-id="${p.id}">
+                <td>${p.order_number}</td>
+                <td><img src="${p.image_url}" alt="문제"></td>
+                <td>${p.unit}</td>
+                <td>
+                  <select class="answer-select" data-id="${p.id}">
+                    <option value="">-</option>
+                    ${[1,2,3,4,5].map(n => `<option value="${n}" ${p.answer == n ? 'selected' : ''}>${n}번</option>`).join('')}
+                  </select>
+                </td>
+                <td>
+                  <button class="btn btn-danger btn-sm" onclick="deleteProblem('${p.id}')">삭제</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function saveAnswers() {
+      const selects = document.querySelectorAll('.answer-select');
+      let saved = 0;
+      for (const sel of selects) {
+        const { error } = await supabase.from('problems')
+          .update({ answer: sel.value ? parseInt(sel.value) : null })
+          .eq('id', sel.dataset.id);
+        if (!error) saved++;
+      }
+      showMsg('dashMsg', `${saved}개 정답이 저장되었습니다.`, 'success');
+    }
+
+    async function deleteProblem(id) {
+      if (!confirm('이 문제를 삭제할까요?')) return;
+
+      // storage 파일도 삭제
+      const { data: prob } = await supabase.from('problems').select('image_url').eq('id', id).single();
+      if (prob) {
+        const url = new URL(prob.image_url);
+        const path = url.pathname.split('/problem-images/')[1];
+        if (path) await supabase.storage.from('problem-images').remove([path]);
+      }
+
+      await supabase.from('problems').delete().eq('id', id);
+      loadProblems();
+      showMsg('dashMsg', '문제가 삭제되었습니다.', 'success');
+    }
+
+    // ── 답안 확인 ──────────────────────────
+    async function loadSubmissions() {
+      const unit = document.getElementById('filterSubmUnit').value;
+      let query = supabase.from('submissions').select('*').order('submitted_at', { ascending: false });
+      if (unit) query = query.eq('unit', unit);
+
+      const { data, error } = await query;
+      const el = document.getElementById('submissionsContent');
+
+      if (error || !data.length) {
+        el.innerHTML = '<p class="empty">제출된 답안이 없습니다.</p>';
+        return;
+      }
+
+      // 해당 단원 문제 수 조회 (정답 채점용)
+      const units = [...new Set(data.map(s => s.unit))];
+      const { data: problems } = await supabase.from('problems')
+        .select('id, unit, order_number, answer')
+        .in('unit', units)
+        .order('order_number');
+
+      const problemMap = {};
+      (problems || []).forEach(p => {
+        if (!problemMap[p.unit]) problemMap[p.unit] = [];
+        problemMap[p.unit].push(p);
+      });
+
+      el.innerHTML = data.map(s => {
+        const probs = problemMap[s.unit] || [];
+        const chips = probs.map((p, i) => {
+          const studentAns = s.answers[p.id] ?? '-';
+          const correct = p.answer ? (parseInt(studentAns) === p.answer ? '✅' : '❌') : '';
+          return `<span class="answer-chip"><span class="q">${i+1}번</span> <span class="a">${studentAns}</span>${correct}</span>`;
+        }).join('');
+
+        const score = p.answer
+          ? `(${probs.filter(p => parseInt(s.answers[p.id]) === p.answer).length}/${probs.filter(p=>p.answer).length}점)`
+          : '';
+
+        return `
+          <div class="submission-card">
+            <div class="student-name">${s.student_name} ${score}</div>
+            <span class="unit-tag">${s.unit}</span>
+            <div class="answer-list">${chips}</div>
+            <div class="submission-time">${new Date(s.submitted_at).toLocaleString('ko-KR')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── 공통 메시지 ────────────────────────
+    function showMsg(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = `msg ${type} show`;
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+  </script>
+</body>
+</html>

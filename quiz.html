@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>시험 풀기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>📝 시험 풀기</h1>
+    <span class="sub" id="headerInfo"></span>
+  </header>
+
+  <div class="quiz-wrapper">
+    <div id="msg" class="msg"></div>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+
+    <div class="exam-paper" id="examPaper">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="quiz-nav">
+      <button class="btn btn-secondary" id="btnPrev" onclick="changePage(-1)" style="display:none">← 이전</button>
+      <span class="page-indicator" id="pageIndicator"></span>
+      <button class="btn btn-primary" id="btnNext" onclick="changePage(1)" style="width:auto">다음 →</button>
+      <button class="btn btn-primary" id="btnSubmit" onclick="submitAnswers()" style="display:none">제출하기 ✓</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script>
+    const studentName = sessionStorage.getItem('studentName');
+    const unit = sessionStorage.getItem('selectedUnit');
+
+    if (!studentName || !unit) location.href = 'index.html';
+
+    document.getElementById('headerInfo').textContent = `${studentName} | ${unit}`;
+
+    let problems = [];
+    let answers = {};   // { problem_id: number }
+    let page = 0;
+    const PER_PAGE = 4;
+
+    async function loadProblems() {
+      const { data, error } = await supabase
+        .from('problems')
+        .select('*')
+        .eq('unit', unit)
+        .order('order_number');
+
+      if (error || !data.length) {
+        document.getElementById('examPaper').innerHTML =
+          '<p class="empty">문제를 불러오지 못했습니다.</p>';
+        return;
+      }
+
+      problems = data;
+      renderPage();
+    }
+
+    function renderPage() {
+      const total = Math.ceil(problems.length / PER_PAGE);
+      const start = page * PER_PAGE;
+      const slice = problems.slice(start, start + PER_PAGE);
+
+      document.getElementById('progressFill').style.width =
+        `${((page + 1) / total) * 100}%`;
+      document.getElementById('pageIndicator').textContent =
+        `${page + 1} / ${total} 페이지`;
+
+      document.getElementById('btnPrev').style.display = page > 0 ? '' : 'none';
+      document.getElementById('btnNext').style.display = page < total - 1 ? '' : 'none';
+      document.getElementById('btnSubmit').style.display = page === total - 1 ? '' : 'none';
+
+      const grid = slice.map((p, i) => {
+        const num = start + i + 1;
+        const selected = answers[p.id] || null;
+        const choices = [1,2,3,4,5].map(n => `
+          <label>
+            <input type="radio" name="q_${p.id}" value="${n}"
+              ${selected === n ? 'checked' : ''}
+              onchange="answers['${p.id}'] = ${n}">
+            ${n}
+          </label>
+        `).join('');
+
+        return `
+          <div class="problem-box">
+            <div class="problem-num">문제 ${num}</div>
+            <img class="problem-img" src="${p.image_url}" alt="문제 ${num}"
+              onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%23f3f4f6%22 width=%22400%22 height=%22300%22/><text x=%22200%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2218%22>이미지 없음</text></svg>'">
+            <div class="problem-choices">${choices}</div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('examPaper').innerHTML = `
+        <div class="exam-header">
+          <h2>${unit}</h2>
+          <div class="meta">응시자: ${studentName} &nbsp;|&nbsp; ${page * PER_PAGE + 1}~${Math.min((page + 1) * PER_PAGE, problems.length)}번 문제</div>
+        </div>
+        <div class="problem-grid">${grid}</div>
+      `;
+    }
+
+    function changePage(dir) {
+      const unanswered = problems
+        .slice(page * PER_PAGE, (page + 1) * PER_PAGE)
+        .filter(p => !answers[p.id]);
+
+      if (unanswered.length && dir === 1) {
+        const confirmed = confirm(`${unanswered.length}개 문제에 답을 선택하지 않았습니다. 그냥 넘어갈까요?`);
+        if (!confirmed) return;
+      }
+
+      page += dir;
+      renderPage();
+      window.scrollTo(0, 0);
+    }
+
+    async function submitAnswers() {
+      const unanswered = problems.filter(p => !answers[p.id]);
+      if (unanswered.length) {
+        const ok = confirm(`${unanswered.length}개 문제에 답이 없습니다. 그대로 제출할까요?`);
+        if (!ok) return;
+      }
+
+      document.getElementById('btnSubmit').disabled = true;
+      document.getElementById('btnSubmit').textContent = '제출 중...';
+
+      const { error } = await supabase.from('submissions').insert({
+        student_name: studentName,
+        unit: unit,
+        answers: answers,
+      });
+
+      if (error) {
+        showMsg('제출 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+        document.getElementById('btnSubmit').disabled = false;
+        document.getElementById('btnSubmit').textContent = '제출하기 ✓';
+        return;
+      }
+
+      document.getElementById('examPaper').innerHTML = `
+        <div style="text-align:center; padding: 60px 0;">
+          <div style="font-size:3rem; margin-bottom:16px;">✅</div>
+          <h2 style="color:#065f46; margin-bottom:8px;">제출 완료!</h2>
+          <p style="color:#6b7280;">${studentName}님의 답안이 제출되었습니다.</p>
+          <button class="btn btn-secondary" style="margin-top:24px; width:auto" onclick="location.href='index.html'">
+            처음으로 돌아가기
+          </button>
+        </div>
+      `;
+      document.querySelector('.quiz-nav').style.display = 'none';
+      document.querySelector('.progress-bar').style.display = 'none';
+    }
+
+    function showMsg(text, type) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = `msg ${type} show`;
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    loadProblems();
+  </script>
+</body>
+</html>

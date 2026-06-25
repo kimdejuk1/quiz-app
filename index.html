@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>온라인 시험</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>📝 온라인 시험</h1>
+    <span class="sub">문제를 선택하여 시작하세요</span>
+  </header>
+
+  <div class="card">
+    <h2>학생 정보 입력</h2>
+    <div id="msg" class="msg"></div>
+
+    <div class="form-group">
+      <label for="studentName">이름</label>
+      <input type="text" id="studentName" placeholder="이름을 입력하세요" maxlength="20">
+    </div>
+
+    <div class="form-group">
+      <label>단원 선택</label>
+      <div id="unitList" class="unit-list">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script>
+    async function loadUnits() {
+      const { data, error } = await supabase
+        .from('problems')
+        .select('unit')
+        .order('unit');
+
+      if (error) {
+        showMsg('단원 목록을 불러오지 못했습니다.', 'error');
+        document.getElementById('unitList').innerHTML = '';
+        return;
+      }
+
+      const units = [...new Set(data.map(r => r.unit))];
+      const list = document.getElementById('unitList');
+
+      if (units.length === 0) {
+        list.innerHTML = '<p class="empty">등록된 문제가 없습니다.<br>교사 페이지에서 문제를 업로드해주세요.</p>';
+        return;
+      }
+
+      list.innerHTML = units.map(u => `
+        <button class="unit-btn" onclick="startQuiz('${u.replace(/'/g, "\\'")}')">
+          📖 ${u}
+        </button>
+      `).join('');
+    }
+
+    function startQuiz(unit) {
+      const name = document.getElementById('studentName').value.trim();
+      if (!name) {
+        showMsg('이름을 입력해주세요.', 'error');
+        document.getElementById('studentName').focus();
+        return;
+      }
+      sessionStorage.setItem('studentName', name);
+      sessionStorage.setItem('selectedUnit', unit);
+      location.href = 'quiz.html';
+    }
+
+    function showMsg(text, type) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = `msg ${type} show`;
+    }
+
+    loadUnits();
+  </script>
+</body>
+</html>
