@@ -254,7 +254,8 @@
 
       for (const file of pendingFiles) {
         const ext = file.name.split('.').pop();
-        const path = `${unit}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const safeUnit = encodeURIComponent(unit).replace(/%/g, '_');
+        const path = `${safeUnit}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
         const { error: upErr } = await supabase.storage
           .from('problem-images')
