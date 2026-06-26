@@ -33,14 +33,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/config.js"></script>
   <script>
-    const studentId   = sessionStorage.getItem('studentId');
-    const studentName = sessionStorage.getItem('studentName');
+    const _profile    = JSON.parse(sessionStorage.getItem('studentProfile') || 'null');
     const unit        = sessionStorage.getItem('selectedUnit');
     const teacherId   = sessionStorage.getItem('teacherId');
     const quizMode    = sessionStorage.getItem('quizMode') || 'normal';
-    const studentInfo = JSON.parse(sessionStorage.getItem('studentInfo') || '{}');
 
-    if (!studentId || !unit || !teacherId) location.href = 'index.html';
+    if (!_profile || !unit || !teacherId) location.href = 'index.html';
+
+    const studentId   = _profile.id;
+    const studentName = _profile.name;
 
     document.getElementById('headerInfo').textContent = `${studentName} | ${unit}`;
     if (quizMode === 'wrong') {

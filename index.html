@@ -73,23 +73,21 @@
         <button class="tab-btn" onclick="switchTab('note')">❌ 오답노트</button>
       </div>
 
-      <!-- 시험 보기 탭 -->
+      <!-- 시험 보기 -->
       <div class="tab-panel active" id="tab-quiz">
         <div id="quizMsg" class="msg"></div>
-
         <div id="teacherStep">
           <p style="color:#6b7280;font-size:0.88rem;margin-bottom:12px;">선생님을 선택해주세요.</p>
           <div id="teacherList" class="unit-list"><div class="spinner"></div></div>
         </div>
-
         <div id="unitStep" style="display:none">
           <button onclick="backToTeacher()" style="background:none;border:none;color:#1a56db;cursor:pointer;font-size:0.88rem;padding:0;margin-bottom:12px;">← 선생님 다시 선택</button>
-          <p style="color:#6b7280;font-size:0.88rem;margin-bottom:12px;" id="selectedTeacherName"></p>
+          <p style="color:#374151;font-size:0.9rem;font-weight:600;margin-bottom:12px;" id="selectedTeacherLabel"></p>
           <div id="unitList" class="unit-list"><div class="spinner"></div></div>
         </div>
       </div>
 
-      <!-- 오답노트 탭 -->
+      <!-- 오답노트 -->
       <div class="tab-panel" id="tab-note">
         <div id="noteContent"><div class="spinner"></div></div>
       </div>
@@ -99,20 +97,22 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/config.js"></script>
   <script>
-    let currentUser = null;
     let studentProfile = null;
     let selectedTeacherId = null;
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        currentUser = session.user;
-        const { data } = await supabase.from('student_profiles').select('*').eq('id', currentUser.id).single();
-        if (!data) { await supabase.auth.signOut(); return; }
-        studentProfile = data;
+    // ── 비밀번호 해시 (SHA-256) ───────────
+    async function hashPw(pw) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    // ── 초기화 ────────────────────────────
+    window.addEventListener('load', () => {
+      const saved = sessionStorage.getItem('studentProfile');
+      if (saved) {
+        studentProfile = JSON.parse(saved);
         showMain();
       } else {
-        currentUser = null;
-        studentProfile = null;
         showAuth();
       }
     });
@@ -133,17 +133,13 @@
       loadTeachers();
     }
 
-    // ── 탭 전환 ──────────────────────────
-    function switchTab(name) {
-      document.querySelectorAll('.tab-btn').forEach((b, i) => {
-        b.classList.toggle('active', ['quiz','note'][i] === name);
-      });
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.getElementById('tab-' + name).classList.add('active');
-      if (name === 'note') loadNote();
+    function logout() {
+      sessionStorage.removeItem('studentProfile');
+      studentProfile = null;
+      showAuth();
     }
 
-    // ── 인증 ──────────────────────────────
+    // ── 인증 탭 ───────────────────────────
     function switchAuthTab(tab) {
       document.getElementById('loginForm').style.display  = tab === 'login'  ? '' : 'none';
       document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
@@ -151,14 +147,28 @@
       document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
     }
 
+    // ── 로그인 ────────────────────────────
     async function login() {
       const username = document.getElementById('loginUsername').value.trim().toLowerCase();
       const password = document.getElementById('loginPassword').value;
       if (!username || !password) { showMsg('loginMsg','아이디와 비밀번호를 입력해주세요.','error'); return; }
-      const { error } = await supabase.auth.signInWithPassword({ email: `${username}@student.quiz`, password });
-      if (error) showMsg('loginMsg','아이디 또는 비밀번호가 올바르지 않습니다.','error');
+
+      const hash = await hashPw(password);
+      const { data, error } = await supabase
+        .from('student_profiles')
+        .select('*')
+        .eq('username', username)
+        .eq('password_hash', hash)
+        .single();
+
+      if (error || !data) { showMsg('loginMsg','아이디 또는 비밀번호가 올바르지 않습니다.','error'); return; }
+
+      studentProfile = data;
+      sessionStorage.setItem('studentProfile', JSON.stringify(data));
+      showMain();
     }
 
+    // ── 회원가입 ──────────────────────────
     async function signup() {
       const grade    = parseInt(document.getElementById('signupGrade').value);
       const classNum = parseInt(document.getElementById('signupClass').value);
@@ -177,24 +187,34 @@
         showMsg('signupMsg','비밀번호는 6자 이상이어야 합니다.','error'); return;
       }
 
-      const { data, error } = await supabase.auth.signUp({ email: `${username}@student.quiz`, password });
-      if (error) {
-        showMsg('signupMsg', error.message.includes('already') ? '이미 사용 중인 아이디입니다.' : '가입 실패: ' + error.message, 'error');
-        return;
-      }
+      // 중복 아이디 확인
+      const { data: exists } = await supabase
+        .from('student_profiles').select('id').eq('username', username).single();
+      if (exists) { showMsg('signupMsg','이미 사용 중인 아이디입니다.','error'); return; }
 
-      const { error: pe } = await supabase.from('student_profiles').insert({
-        id: data.user.id, username, name, grade, class_num: classNum, number,
+      const id   = crypto.randomUUID();
+      const hash = await hashPw(password);
+
+      const { error } = await supabase.from('student_profiles').insert({
+        id, username, name, grade, class_num: classNum, number, password_hash: hash,
       });
-      if (pe) {
-        showMsg('signupMsg','프로필 저장 실패: ' + pe.message,'error');
-        await supabase.auth.signOut(); return;
-      }
+
+      if (error) { showMsg('signupMsg','가입 실패: ' + error.message,'error'); return; }
+
       showMsg('signupMsg','가입 완료! 로그인해주세요.','success');
+      document.getElementById('loginUsername').value = username;
       switchAuthTab('login');
     }
 
-    async function logout() { await supabase.auth.signOut(); }
+    // ── 탭 전환 ───────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['quiz','note'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'note') loadNote();
+    }
 
     // ── 시험 선택 ─────────────────────────
     async function loadTeachers() {
@@ -209,19 +229,21 @@
 
     async function selectTeacher(teacherId, teacherName) {
       selectedTeacherId = teacherId;
-      document.getElementById('selectedTeacherName').textContent = `👨‍🏫 ${teacherName} 선생님 단원 선택`;
+      document.getElementById('selectedTeacherLabel').textContent = `👨‍🏫 ${teacherName} 선생님`;
       document.getElementById('teacherStep').style.display = 'none';
       document.getElementById('unitStep').style.display = '';
       document.getElementById('unitList').innerHTML = '<div class="spinner"></div>';
 
-      const { data } = await supabase.from('problems').select('unit').eq('teacher_id', teacherId).order('unit');
+      const { data } = await supabase.from('problems').select('unit')
+        .eq('teacher_id', teacherId).order('unit');
       const units = [...new Set((data||[]).map(r => r.unit))];
       const list = document.getElementById('unitList');
       if (!units.length) { list.innerHTML = '<p class="empty">등록된 문제가 없습니다.</p>'; return; }
 
-      // 이 학생의 오답 단원 조회
+      // 오답 있는 단원 확인
       const { data: wrongData } = await supabase.from('problem_results')
-        .select('unit').eq('student_id', currentUser.id).eq('teacher_id', teacherId).eq('is_correct', false);
+        .select('unit').eq('student_id', studentProfile.id)
+        .eq('teacher_id', teacherId).eq('is_correct', false);
       const wrongUnits = new Set((wrongData||[]).map(r => r.unit));
 
       list.innerHTML = units.map(u => `
@@ -243,12 +265,9 @@
     }
 
     function startQuiz(unit, mode) {
-      sessionStorage.setItem('studentId',   currentUser.id);
-      sessionStorage.setItem('studentName', studentProfile.name);
-      sessionStorage.setItem('studentInfo', JSON.stringify(studentProfile));
       sessionStorage.setItem('selectedUnit', unit);
-      sessionStorage.setItem('teacherId',   selectedTeacherId);
-      sessionStorage.setItem('quizMode',    mode);
+      sessionStorage.setItem('teacherId',    selectedTeacherId);
+      sessionStorage.setItem('quizMode',     mode);
       location.href = 'quiz.html';
     }
 
@@ -260,7 +279,7 @@
       const { data: results } = await supabase
         .from('problem_results')
         .select('problem_id, unit, teacher_id, is_correct, student_answer, submitted_at')
-        .eq('student_id', currentUser.id)
+        .eq('student_id', studentProfile.id)
         .order('submitted_at', { ascending: false });
 
       if (!results?.length) {
@@ -279,7 +298,7 @@
       const teacherMap = Object.fromEntries((teachers||[]).map(t => [t.id, t.display_name]));
       const problemMap = Object.fromEntries((problems||[]).map(p => [p.id, p]));
 
-      // 문항별 최신 결과만 사용
+      // 문항별 최신 결과만
       const latest = {};
       for (const r of results) {
         if (!latest[r.problem_id]) latest[r.problem_id] = r;
@@ -289,32 +308,32 @@
       const grouped = {};
       for (const r of Object.values(latest)) {
         if (!grouped[r.teacher_id]) grouped[r.teacher_id] = {};
-        if (!grouped[r.teacher_id][r.unit]) grouped[r.teacher_id][r.unit] = { correct: [], wrong: [] };
+        if (!grouped[r.teacher_id][r.unit]) grouped[r.teacher_id][r.unit] = { correct:[], wrong:[] };
         (r.is_correct ? grouped[r.teacher_id][r.unit].correct : grouped[r.teacher_id][r.unit].wrong).push(r);
       }
 
       let html = '';
       for (const [tId, units] of Object.entries(grouped)) {
-        const tName = teacherMap[tId] || '알 수 없음';
-        html += `<h3 style="margin:8px 0 12px;color:#374151;font-size:1rem;">👨‍🏫 ${tName}</h3>`;
+        html += `<h3 style="margin:8px 0 12px;color:#374151;font-size:1rem;">👨‍🏫 ${teacherMap[tId]||'알 수 없음'}</h3>`;
 
         for (const [unit, { correct, wrong }] of Object.entries(units)) {
           const total = correct.length + wrong.length;
           const score = Math.round((correct.length / total) * 100);
           const barColor = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
 
-          const chips = [...correct.map(r=>({...r,ok:true})), ...wrong.map(r=>({...r,ok:false}))]
-            .sort((a,b) => (problemMap[a.problem_id]?.order_number||0) - (problemMap[b.problem_id]?.order_number||0))
-            .map(r => {
-              const p = problemMap[r.problem_id];
-              const bg = r.is_correct === null ? '#f3f4f6' : r.ok ? '#d1fae5' : '#fee2e2';
-              const ic = r.is_correct === null ? '?' : r.ok ? '✅' : '❌';
-              return `<div style="background:${bg};border-radius:8px;padding:6px 10px;font-size:0.82rem;text-align:center;min-width:52px;">
-                <div style="font-weight:700">${p?.order_number??'?'}번</div>
-                <div>${ic}</div>
-                <div style="color:#6b7280">${r.student_answer??'-'}번</div>
-              </div>`;
-            }).join('');
+          const sortedAll = [...correct.map(r=>({...r,ok:true})), ...wrong.map(r=>({...r,ok:false}))]
+            .sort((a,b) => (problemMap[a.problem_id]?.order_number||0) - (problemMap[b.problem_id]?.order_number||0));
+
+          const chips = sortedAll.map(r => {
+            const p = problemMap[r.problem_id];
+            const bg = r.is_correct===null ? '#f3f4f6' : r.ok ? '#d1fae5' : '#fee2e2';
+            const ic = r.is_correct===null ? '?' : r.ok ? '✅' : '❌';
+            return `<div style="background:${bg};border-radius:8px;padding:6px 10px;font-size:0.82rem;text-align:center;min-width:52px;">
+              <div style="font-weight:700">${p?.order_number??'?'}번</div>
+              <div>${ic}</div>
+              <div style="color:#6b7280">${r.student_answer??'-'}번</div>
+            </div>`;
+          }).join('');
 
           const wrongImgs = wrong.map(r => {
             const p = problemMap[r.problem_id];
@@ -341,10 +360,12 @@
               <div style="height:8px;background:#e5e7eb;border-radius:4px;margin-bottom:12px;overflow:hidden;">
                 <div style="height:100%;width:${score}%;background:${barColor};border-radius:4px;"></div>
               </div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${wrong.length?'12px':'0'}">${chips}</div>
-              ${wrong.length > 0 ? `
+              <div style="display:flex;flex-wrap:wrap;gap:8px;${wrong.length?'margin-bottom:12px':''}">${chips}</div>
+              ${wrong.length ? `
               <details>
-                <summary style="cursor:pointer;font-size:0.85rem;color:#1a56db;font-weight:600;margin-top:4px;">틀린 문항 이미지 보기 (${wrong.length}개)</summary>
+                <summary style="cursor:pointer;font-size:0.85rem;color:#1a56db;font-weight:600;margin-top:4px;">
+                  틀린 문항 이미지 보기 (${wrong.length}개)
+                </summary>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:10px;">${wrongImgs}</div>
               </details>` : ''}
             </div>`;
