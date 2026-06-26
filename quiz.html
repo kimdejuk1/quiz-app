@@ -7,6 +7,108 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── 1문제 전체화면 레이아웃 ── */
+    body { background: #111; }
+    header { position: sticky; top: 0; z-index: 10; }
+
+    .single-wrapper {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 12px 12px 100px;
+    }
+
+    /* 진행 바 + 문제 번호 */
+    .single-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .single-top .page-indicator {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .progress-bar { flex: 1; margin: 0; }
+
+    /* 문제 카드 */
+    .single-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    .single-num {
+      background: #1a56db;
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 10px 16px;
+    }
+    .single-img {
+      width: 100%;
+      display: block;
+      background: #f9fafb;
+      object-fit: contain;
+      max-height: 60vh;
+    }
+
+    /* 보기 버튼 */
+    .choices-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      padding: 14px;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+    }
+    .choice-btn {
+      border: 2px solid #d1d5db;
+      border-radius: 10px;
+      background: white;
+      font-size: 1.2rem;
+      font-weight: 700;
+      padding: 14px 0;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #374151;
+    }
+    .choice-btn:hover  { border-color: #1a56db; background: #eff6ff; color: #1a56db; }
+    .choice-btn.chosen { border-color: #1a56db; background: #1a56db; color: white; }
+
+    /* 하단 고정 네비게이션 */
+    .single-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #1a1a1a;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 20;
+    }
+    .single-nav .btn { width: auto; min-width: 90px; }
+    .skip-hint { color: #9ca3af; font-size: 0.8rem; text-align: center; flex: 1; }
+
+    /* 결과 화면 */
+    .result-wrapper {
+      max-width: 600px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+    .result-card {
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+
+    /* 메시지 */
+    #msg { margin: 0 0 10px; }
+  </style>
 </head>
 <body>
   <header>
@@ -14,29 +116,45 @@
     <span class="sub" id="headerInfo"></span>
   </header>
 
-  <div class="quiz-wrapper">
-    <div id="msg" class="msg"></div>
-    <div class="progress-bar">
-      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  <div id="loadingView" style="text-align:center;padding:80px 0">
+    <div class="spinner" style="margin:0 auto"></div>
+  </div>
+
+  <!-- 문제 풀기 화면 -->
+  <div id="quizView" style="display:none">
+    <div class="single-wrapper">
+      <div id="msg" class="msg"></div>
+      <div class="single-top">
+        <span class="page-indicator" id="pageIndicator"></span>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="single-card" id="problemCard"></div>
     </div>
-    <div class="exam-paper" id="examPaper">
-      <div class="spinner"></div>
+
+    <div class="single-nav">
+      <button class="btn btn-secondary" id="btnPrev" onclick="go(-1)">← 이전</button>
+      <span class="skip-hint" id="skipHint"></span>
+      <button class="btn btn-primary" id="btnNext" onclick="go(1)">다음 →</button>
+      <button class="btn btn-primary" id="btnSubmit" onclick="submitAnswers()" style="display:none;background:#10b981">제출 ✓</button>
     </div>
-    <div class="quiz-nav">
-      <button class="btn btn-secondary" id="btnPrev" onclick="changePage(-1)" style="display:none">← 이전</button>
-      <span class="page-indicator" id="pageIndicator"></span>
-      <button class="btn btn-primary" id="btnNext" onclick="changePage(1)" style="width:auto">다음 →</button>
-      <button class="btn btn-primary" id="btnSubmit" onclick="submitAnswers()" style="display:none">제출하기 ✓</button>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="resultView" style="display:none">
+    <div class="result-wrapper">
+      <div class="result-card" id="resultCard"></div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/config.js"></script>
   <script>
-    const _profile    = JSON.parse(sessionStorage.getItem('studentProfile') || 'null');
-    const unit        = sessionStorage.getItem('selectedUnit');
-    const teacherId   = sessionStorage.getItem('teacherId');
-    const quizMode    = sessionStorage.getItem('quizMode') || 'normal';
+    const _profile  = JSON.parse(sessionStorage.getItem('studentProfile') || 'null');
+    const unit      = sessionStorage.getItem('selectedUnit');
+    const teacherId = sessionStorage.getItem('teacherId');
+    const quizMode  = sessionStorage.getItem('quizMode') || 'normal';
 
     if (!_profile || !unit || !teacherId) location.href = 'index.html';
 
@@ -44,21 +162,18 @@
     const studentName = _profile.name;
 
     document.getElementById('headerInfo').textContent = `${studentName} | ${unit}`;
-    if (quizMode === 'wrong') {
-      document.getElementById('headerMode').textContent = '❌ 오답 다시 풀기';
-    }
+    if (quizMode === 'wrong') document.getElementById('headerMode').textContent = '❌ 오답 다시 풀기';
 
     let problems = [];
-    let answers  = {};
-    let page     = 0;
-    const PER_PAGE = 4;
+    let answers  = {};   // { problem_id: number }
+    let idx      = 0;    // 현재 문제 인덱스 (0-based)
 
+    // ── 문제 로드 ─────────────────────────
     async function loadProblems() {
-      let problemsData;
+      let data;
 
       if (quizMode === 'wrong') {
-        // 틀린 문항 ID 목록 조회 (가장 최근 결과 기준)
-        const { data: wrongResults } = await supabase
+        const { data: wr } = await supabase
           .from('problem_results')
           .select('problem_id')
           .eq('student_id', studentId)
@@ -67,90 +182,70 @@
           .eq('is_correct', false)
           .order('submitted_at', { ascending: false });
 
-        // 중복 제거 (같은 문제를 여러 번 틀렸을 수 있음)
-        const wrongIds = [...new Set((wrongResults||[]).map(r => r.problem_id))];
-
-        if (!wrongIds.length) {
-          document.getElementById('examPaper').innerHTML =
-            '<p class="empty" style="padding:60px 0">🎉 틀린 문항이 없습니다!</p>';
-          document.querySelector('.quiz-nav').style.display = 'none';
+        const ids = [...new Set((wr||[]).map(r => r.problem_id))];
+        if (!ids.length) {
+          showEmpty('🎉 틀린 문항이 없습니다!');
           return;
         }
-
-        const { data } = await supabase
-          .from('problems')
-          .select('*')
-          .in('id', wrongIds)
-          .order('order_number');
-        problemsData = data;
+        ({ data } = await supabase.from('problems').select('*').in('id', ids).order('order_number'));
       } else {
-        const { data } = await supabase
-          .from('problems')
-          .select('*')
-          .eq('unit', unit)
-          .eq('teacher_id', teacherId)
-          .order('order_number');
-        problemsData = data;
+        ({ data } = await supabase.from('problems').select('*')
+          .eq('unit', unit).eq('teacher_id', teacherId).order('order_number'));
       }
 
-      if (!problemsData?.length) {
-        document.getElementById('examPaper').innerHTML =
-          '<p class="empty">문제를 불러오지 못했습니다.</p>';
-        return;
-      }
+      if (!data?.length) { showEmpty('문제를 불러오지 못했습니다.'); return; }
 
-      problems = problemsData;
-      renderPage();
+      problems = data;
+      document.getElementById('loadingView').style.display = 'none';
+      document.getElementById('quizView').style.display = '';
+      renderProblem();
     }
 
-    function renderPage() {
-      const total = Math.ceil(problems.length / PER_PAGE);
-      const start = page * PER_PAGE;
-      const slice = problems.slice(start, start + PER_PAGE);
+    // ── 문제 렌더링 ───────────────────────
+    function renderProblem() {
+      const p       = problems[idx];
+      const total   = problems.length;
+      const chosen  = answers[p.id] || null;
+      const isLast  = idx === total - 1;
 
-      document.getElementById('progressFill').style.width = `${((page+1)/total)*100}%`;
-      document.getElementById('pageIndicator').textContent = `${page+1} / ${total} 페이지`;
-      document.getElementById('btnPrev').style.display   = page > 0          ? '' : 'none';
-      document.getElementById('btnNext').style.display   = page < total - 1  ? '' : 'none';
-      document.getElementById('btnSubmit').style.display = page === total - 1 ? '' : 'none';
+      document.getElementById('progressFill').style.width = `${((idx + 1) / total) * 100}%`;
+      document.getElementById('pageIndicator').textContent = `${idx + 1} / ${total}`;
+      document.getElementById('btnPrev').style.display   = idx > 0 ? '' : 'none';
+      document.getElementById('btnNext').style.display   = isLast ? 'none' : '';
+      document.getElementById('btnSubmit').style.display = isLast ? '' : 'none';
+      document.getElementById('skipHint').textContent    = chosen ? '' : '답을 선택해주세요';
 
-      const grid = slice.map((p, i) => {
-        const num = start + i + 1;
-        const selected = answers[p.id] || null;
-        const choices = [1,2,3,4,5].map(n => `
-          <label>
-            <input type="radio" name="q_${p.id}" value="${n}"
-              ${selected === n ? 'checked' : ''}
-              onchange="answers['${p.id}'] = ${n}">
-            ${n}
-          </label>`).join('');
-        return `
-          <div class="problem-box">
-            <div class="problem-num">문제 ${num}</div>
-            <img class="problem-img" src="${p.image_url}" alt="문제 ${num}"
-              onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%23f3f4f6%22 width=%22400%22 height=%22300%22/><text x=%22200%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2218%22>이미지 없음</text></svg>'">
-            <div class="problem-choices">${choices}</div>
-          </div>`;
-      }).join('');
+      const choiceBtns = [1,2,3,4,5].map(n => `
+        <button class="choice-btn ${chosen === n ? 'chosen' : ''}"
+          onclick="selectAnswer(${n})">${n}번</button>`).join('');
 
-      document.getElementById('examPaper').innerHTML = `
-        <div class="exam-header">
-          <h2>${unit}${quizMode === 'wrong' ? ' — 오답 풀기' : ''}</h2>
-          <div class="meta">응시자: ${studentName} &nbsp;|&nbsp; ${start+1}~${Math.min((page+1)*PER_PAGE, problems.length)}번 문제</div>
-        </div>
-        <div class="problem-grid">${grid}</div>`;
+      document.getElementById('problemCard').innerHTML = `
+        <div class="single-num">문제 ${idx + 1}${quizMode === 'wrong' ? ' (오답 재풀기)' : ''}</div>
+        <img class="single-img" src="${p.image_url}" alt="문제 ${idx + 1}"
+          onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%23f3f4f6%22 width=%22400%22 height=%22300%22/><text x=%22200%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2218%22>이미지 없음</text></svg>'">
+        <div class="choices-grid">${choiceBtns}</div>`;
     }
 
-    function changePage(dir) {
-      const unanswered = problems.slice(page*PER_PAGE, (page+1)*PER_PAGE).filter(p => !answers[p.id]);
-      if (unanswered.length && dir === 1) {
-        if (!confirm(`${unanswered.length}개 문제에 답을 선택하지 않았습니다. 그냥 넘어갈까요?`)) return;
+    function selectAnswer(n) {
+      answers[problems[idx].id] = n;
+      renderProblem();
+      // 마지막 문제가 아니면 0.3초 후 자동으로 다음 문제로
+      if (idx < problems.length - 1) {
+        setTimeout(() => go(1), 300);
       }
-      page += dir;
-      renderPage();
+    }
+
+    function go(dir) {
+      if (dir === 1 && idx < problems.length - 1) {
+        idx++;
+      } else if (dir === -1 && idx > 0) {
+        idx--;
+      }
+      renderProblem();
       window.scrollTo(0, 0);
     }
 
+    // ── 제출 ──────────────────────────────
     async function submitAnswers() {
       const unanswered = problems.filter(p => !answers[p.id]);
       if (unanswered.length) {
@@ -160,16 +255,10 @@
       document.getElementById('btnSubmit').disabled = true;
       document.getElementById('btnSubmit').textContent = '제출 중...';
 
-      // submissions 저장
       await supabase.from('submissions').insert({
-        student_name: studentName,
-        unit,
-        answers,
-        teacher_id: teacherId,
-        student_id: studentId,
+        student_name: studentName, unit, answers, teacher_id: teacherId, student_id: studentId,
       });
 
-      // problem_results 저장 (문항별 정답 여부)
       const results = problems.map(p => ({
         student_id:     studentId,
         problem_id:     p.id,
@@ -180,60 +269,58 @@
       }));
       await supabase.from('problem_results').insert(results);
 
-      // 채점 결과 표시
-      const gradable = problems.filter(p => p.answer !== null);
-      const correct  = gradable.filter(p => parseInt(answers[p.id]) === p.answer);
-      const hasAnswerKey = gradable.length > 0;
+      showResult();
+    }
 
-      const resultRows = problems.map((p, i) => {
-        const myAns     = answers[p.id] ?? '-';
-        const hasCorrect = p.answer !== null;
-        const isCorrect  = hasCorrect && parseInt(myAns) === p.answer;
-        const icon       = !hasCorrect ? '' : isCorrect ? '✅' : '❌';
-        const correctTxt = hasCorrect ? `<span style="color:#6b7280;font-size:0.8rem;">정답: ${p.answer}번</span>` : '';
-        const bg         = !hasCorrect ? '#f9fafb' : isCorrect ? '#d1fae5' : '#fee2e2';
+    // ── 결과 화면 ─────────────────────────
+    function showResult() {
+      document.getElementById('quizView').style.display = 'none';
+      document.getElementById('resultView').style.display = '';
+      document.body.style.background = '#f4f6f9';
+
+      const gradable   = problems.filter(p => p.answer !== null);
+      const correct    = gradable.filter(p => parseInt(answers[p.id]) === p.answer);
+      const wrongCount = gradable.length - correct.length;
+      const hasKey     = gradable.length > 0;
+
+      const rows = problems.map((p, i) => {
+        const my  = answers[p.id] ?? null;
+        const ok  = p.answer !== null ? parseInt(my) === p.answer : null;
+        const bg  = ok === null ? '#f9fafb' : ok ? '#d1fae5' : '#fee2e2';
+        const ic  = ok === null ? '' : ok ? '✅' : '❌';
+        const ans = p.answer !== null ? `<span style="color:#6b7280;font-size:0.8rem;"> → 정답: ${p.answer}번</span>` : '';
         return `
-          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
                       border-radius:8px;background:${bg};margin-bottom:8px;">
-            <span style="font-weight:700;min-width:60px;">문제 ${i+1}</span>
-            <span>내 답: <strong>${myAns !== '-' ? myAns+'번' : '-'}</strong></span>
-            ${correctTxt}
-            <span style="margin-left:auto;font-size:1.2rem;">${icon}</span>
+            <span style="font-weight:700;min-width:56px;">문제 ${i+1}</span>
+            <span>내 답: <strong>${my ? my+'번' : '미응답'}</strong>${ans}</span>
+            <span style="margin-left:auto;font-size:1.1rem;">${ic}</span>
           </div>`;
       }).join('');
 
-      const scoreHtml = hasAnswerKey
-        ? `<p style="font-size:1.2rem;font-weight:700;color:#1a56db;margin:12px 0;">
-             ${correct.length} / ${gradable.length} 정답
-           </p>`
-        : `<p style="color:#6b7280;margin:12px 0;">교사가 정답을 설정하지 않아 채점 결과를 표시할 수 없습니다.</p>`;
-
-      const wrongCount = gradable.length - correct.length;
-
-      document.getElementById('examPaper').innerHTML = `
-        <div style="padding:24px 0">
-          <div style="text-align:center;margin-bottom:24px;">
-            <div style="font-size:2.5rem;margin-bottom:8px;">
-              ${!hasAnswerKey ? '✅' : correct.length === gradable.length ? '🎉' : '📝'}
-            </div>
-            <h2 style="margin-bottom:4px;">${studentName}님 제출 완료!</h2>
-            ${scoreHtml}
-            ${wrongCount > 0 ? `<p style="color:#ef4444;font-size:0.9rem;">틀린 문항 ${wrongCount}개 — 오답노트에 저장됐습니다.</p>` : ''}
+      document.getElementById('resultCard').innerHTML = `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:2.5rem;margin-bottom:8px;">
+            ${!hasKey ? '✅' : correct.length === gradable.length ? '🎉' : '📝'}
           </div>
-          <div>${resultRows}</div>
-          <div style="text-align:center;margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button class="btn btn-secondary" style="width:auto" onclick="location.href='index.html'">처음으로</button>
-            ${wrongCount > 0 ? `<button class="btn btn-primary" style="width:auto;background:#ef4444" onclick="retryWrong()">❌ 틀린 문항 바로 풀기</button>` : ''}
-            <button class="btn btn-primary" style="width:auto" onclick="location.href='student.html'">📊 내 오답노트</button>
-          </div>
+          <h2 style="margin-bottom:6px;">${studentName}님 제출 완료!</h2>
+          ${hasKey
+            ? `<p style="font-size:1.2rem;font-weight:700;color:#1a56db;margin:8px 0">${correct.length} / ${gradable.length} 정답</p>`
+            : `<p style="color:#6b7280;margin:8px 0">교사가 정답을 설정하지 않아 채점 결과를 표시할 수 없습니다.</p>`}
+          ${wrongCount > 0 ? `<p style="color:#ef4444;font-size:0.88rem;">틀린 문항 ${wrongCount}개 — 오답노트에 저장됐습니다.</p>` : ''}
+        </div>
+        <div style="margin-bottom:20px;">${rows}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <button class="btn btn-secondary" style="width:auto" onclick="location.href='index.html'">처음으로</button>
+          ${wrongCount > 0 ? `<button class="btn btn-primary" style="width:auto;background:#ef4444"
+            onclick="sessionStorage.setItem('quizMode','wrong');location.reload()">❌ 틀린 문항 바로 풀기</button>` : ''}
         </div>`;
-      document.querySelector('.quiz-nav').style.display = 'none';
-      document.querySelector('.progress-bar').style.display = 'none';
     }
 
-    function retryWrong() {
-      sessionStorage.setItem('quizMode', 'wrong');
-      location.reload();
+    function showEmpty(msg) {
+      document.getElementById('loadingView').innerHTML =
+        `<p style="color:white;font-size:1.1rem;margin-top:80px;">${msg}</p>
+         <button class="btn btn-secondary" style="width:auto;margin-top:20px" onclick="location.href='index.html'">돌아가기</button>`;
     }
 
     loadProblems();
