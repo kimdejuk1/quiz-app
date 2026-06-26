@@ -11,9 +11,8 @@
 <body>
   <header>
     <h1>📝 온라인 시험</h1>
-    <div style="display:flex; align-items:center; gap:10px; margin-left:auto;">
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
       <span class="sub" id="headerName"></span>
-      <button class="btn btn-secondary btn-sm" id="btnMyPage" onclick="location.href='student.html'" style="display:none">내 오답노트</button>
       <button class="btn btn-secondary btn-sm" id="btnLogout" onclick="logout()" style="display:none">로그아웃</button>
     </div>
   </header>
@@ -21,7 +20,7 @@
   <!-- ── 로그인/회원가입 ── -->
   <div id="authSection">
     <div class="card" style="max-width:440px">
-      <div style="display:flex; gap:4px; margin-bottom:20px;">
+      <div style="display:flex;gap:4px;margin-bottom:20px;">
         <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')" style="border-radius:8px">로그인</button>
         <button class="tab-btn" id="tabSignup" onclick="switchAuthTab('signup')" style="border-radius:8px">회원가입</button>
       </div>
@@ -35,7 +34,8 @@
         </div>
         <div class="form-group">
           <label>비밀번호</label>
-          <input type="password" id="loginPassword" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter') login()">
+          <input type="password" id="loginPassword" placeholder="비밀번호 입력"
+            onkeydown="if(event.key==='Enter') login()">
         </div>
         <button class="btn btn-primary" onclick="login()">로그인</button>
       </div>
@@ -43,30 +43,21 @@
       <!-- 회원가입 -->
       <div id="signupForm" style="display:none">
         <div id="signupMsg" class="msg"></div>
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:16px;">
-          <div class="form-group" style="margin:0">
-            <label>학년</label>
-            <input type="number" id="signupGrade" placeholder="1" min="1" max="6">
-          </div>
-          <div class="form-group" style="margin:0">
-            <label>반</label>
-            <input type="number" id="signupClass" placeholder="1" min="1" max="20">
-          </div>
-          <div class="form-group" style="margin:0">
-            <label>번호</label>
-            <input type="number" id="signupNumber" placeholder="1" min="1" max="50">
-          </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div><label>학년</label><input type="number" id="signupGrade" placeholder="1" min="1" max="6" style="margin:4px 0 0"></div>
+          <div><label>반</label><input type="number" id="signupClass" placeholder="1" min="1" max="20" style="margin:4px 0 0"></div>
+          <div><label>번호</label><input type="number" id="signupNumber" placeholder="1" min="1" max="50" style="margin:4px 0 0"></div>
         </div>
         <div class="form-group">
           <label>이름</label>
           <input type="text" id="signupName" placeholder="이름 입력" maxlength="10">
         </div>
         <div class="form-group">
-          <label>아이디 <span style="color:#9ca3af; font-weight:400; font-size:0.8rem">(영문+숫자, 4~16자)</span></label>
+          <label>아이디 <span style="color:#9ca3af;font-weight:400;font-size:0.8rem">(영문+숫자, 4~16자)</span></label>
           <input type="text" id="signupUsername" placeholder="아이디 입력" maxlength="16">
         </div>
         <div class="form-group">
-          <label>비밀번호 <span style="color:#9ca3af; font-weight:400; font-size:0.8rem">(6자 이상)</span></label>
+          <label>비밀번호 <span style="color:#9ca3af;font-weight:400;font-size:0.8rem">(6자 이상)</span></label>
           <input type="password" id="signupPassword" placeholder="비밀번호 입력">
         </div>
         <button class="btn btn-primary" onclick="signup()">회원가입</button>
@@ -74,29 +65,33 @@
     </div>
   </div>
 
-  <!-- ── 시험 선택 (로그인 후) ── -->
-  <div id="quizSection" style="display:none">
-    <div class="card">
-      <h2>시험 선택</h2>
-      <div id="quizMsg" class="msg"></div>
+  <!-- ── 메인 (로그인 후) ── -->
+  <div id="mainSection" style="display:none">
+    <div class="teacher-layout">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('quiz')">📖 시험 보기</button>
+        <button class="tab-btn" onclick="switchTab('note')">❌ 오답노트</button>
+      </div>
 
-      <!-- Step 1: 선생님 선택 -->
-      <div id="teacherStep">
-        <label class="form-label">선생님 선택</label>
-        <div id="teacherList" class="unit-list">
-          <div class="spinner"></div>
+      <!-- 시험 보기 탭 -->
+      <div class="tab-panel active" id="tab-quiz">
+        <div id="quizMsg" class="msg"></div>
+
+        <div id="teacherStep">
+          <p style="color:#6b7280;font-size:0.88rem;margin-bottom:12px;">선생님을 선택해주세요.</p>
+          <div id="teacherList" class="unit-list"><div class="spinner"></div></div>
+        </div>
+
+        <div id="unitStep" style="display:none">
+          <button onclick="backToTeacher()" style="background:none;border:none;color:#1a56db;cursor:pointer;font-size:0.88rem;padding:0;margin-bottom:12px;">← 선생님 다시 선택</button>
+          <p style="color:#6b7280;font-size:0.88rem;margin-bottom:12px;" id="selectedTeacherName"></p>
+          <div id="unitList" class="unit-list"><div class="spinner"></div></div>
         </div>
       </div>
 
-      <!-- Step 2: 단원 선택 -->
-      <div id="unitStep" style="display:none">
-        <label class="form-label">
-          <button onclick="backToTeacher()" style="background:none;border:none;color:#1a56db;cursor:pointer;font-size:0.85rem;padding:0;margin-right:6px;">← 다시 선택</button>
-          단원 선택 <span id="selectedTeacherName" style="color:#6b7280;font-weight:400;"></span>
-        </label>
-        <div id="unitList" class="unit-list">
-          <div class="spinner"></div>
-        </div>
+      <!-- 오답노트 탭 -->
+      <div class="tab-panel" id="tab-note">
+        <div id="noteContent"><div class="spinner"></div></div>
       </div>
     </div>
   </div>
@@ -104,14 +99,17 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/config.js"></script>
   <script>
-    let selectedTeacherId = null;
     let currentUser = null;
     let studentProfile = null;
+    let selectedTeacherId = null;
 
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         currentUser = session.user;
-        await loadStudentProfile();
+        const { data } = await supabase.from('student_profiles').select('*').eq('id', currentUser.id).single();
+        if (!data) { await supabase.auth.signOut(); return; }
+        studentProfile = data;
+        showMain();
       } else {
         currentUser = null;
         studentProfile = null;
@@ -119,54 +117,46 @@
       }
     });
 
-    async function loadStudentProfile() {
-      const { data } = await supabase
-        .from('student_profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
-
-      if (!data) { await supabase.auth.signOut(); return; }
-      studentProfile = data;
-      showQuizSection();
-    }
-
     function showAuth() {
       document.getElementById('authSection').style.display = '';
-      document.getElementById('quizSection').style.display = 'none';
+      document.getElementById('mainSection').style.display = 'none';
       document.getElementById('btnLogout').style.display = 'none';
-      document.getElementById('btnMyPage').style.display = 'none';
       document.getElementById('headerName').textContent = '';
     }
 
-    function showQuizSection() {
+    function showMain() {
       document.getElementById('authSection').style.display = 'none';
-      document.getElementById('quizSection').style.display = '';
+      document.getElementById('mainSection').style.display = '';
       document.getElementById('btnLogout').style.display = '';
-      document.getElementById('btnMyPage').style.display = '';
       document.getElementById('headerName').textContent =
         `${studentProfile.grade}학년 ${studentProfile.class_num}반 ${studentProfile.number}번 ${studentProfile.name}`;
       loadTeachers();
     }
 
+    // ── 탭 전환 ──────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['quiz','note'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'note') loadNote();
+    }
+
     // ── 인증 ──────────────────────────────
     function switchAuthTab(tab) {
-      document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
+      document.getElementById('loginForm').style.display  = tab === 'login'  ? '' : 'none';
       document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
-      document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+      document.getElementById('tabLogin').classList.toggle('active',  tab === 'login');
       document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
     }
 
     async function login() {
       const username = document.getElementById('loginUsername').value.trim().toLowerCase();
       const password = document.getElementById('loginPassword').value;
-      if (!username || !password) { showAuthMsg('loginMsg', '아이디와 비밀번호를 입력해주세요.', 'error'); return; }
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: `${username}@student.quiz`,
-        password,
-      });
-      if (error) showAuthMsg('loginMsg', '아이디 또는 비밀번호가 올바르지 않습니다.', 'error');
+      if (!username || !password) { showMsg('loginMsg','아이디와 비밀번호를 입력해주세요.','error'); return; }
+      const { error } = await supabase.auth.signInWithPassword({ email: `${username}@student.quiz`, password });
+      if (error) showMsg('loginMsg','아이디 또는 비밀번호가 올바르지 않습니다.','error');
     }
 
     async function signup() {
@@ -178,101 +168,72 @@
       const password = document.getElementById('signupPassword').value;
 
       if (!grade || !classNum || !number || !name || !username || !password) {
-        showAuthMsg('signupMsg', '모든 항목을 입력해주세요.', 'error'); return;
+        showMsg('signupMsg','모든 항목을 입력해주세요.','error'); return;
       }
       if (!/^[a-z0-9]{4,16}$/.test(username)) {
-        showAuthMsg('signupMsg', '아이디는 영문 소문자+숫자 4~16자로 입력해주세요.', 'error'); return;
+        showMsg('signupMsg','아이디는 영문 소문자+숫자 4~16자로 입력해주세요.','error'); return;
       }
       if (password.length < 6) {
-        showAuthMsg('signupMsg', '비밀번호는 6자 이상이어야 합니다.', 'error'); return;
+        showMsg('signupMsg','비밀번호는 6자 이상이어야 합니다.','error'); return;
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: `${username}@student.quiz`,
-        password,
-      });
+      const { data, error } = await supabase.auth.signUp({ email: `${username}@student.quiz`, password });
       if (error) {
-        showAuthMsg('signupMsg', error.message.includes('already') ? '이미 사용 중인 아이디입니다.' : error.message, 'error');
+        showMsg('signupMsg', error.message.includes('already') ? '이미 사용 중인 아이디입니다.' : '가입 실패: ' + error.message, 'error');
         return;
       }
 
-      const { error: profileErr } = await supabase.from('student_profiles').insert({
-        id: data.user.id,
-        username,
-        name,
-        grade,
-        class_num: classNum,
-        number,
+      const { error: pe } = await supabase.from('student_profiles').insert({
+        id: data.user.id, username, name, grade, class_num: classNum, number,
       });
-      if (profileErr) {
-        showAuthMsg('signupMsg', '프로필 저장 실패: ' + profileErr.message, 'error');
-        await supabase.auth.signOut();
-        return;
+      if (pe) {
+        showMsg('signupMsg','프로필 저장 실패: ' + pe.message,'error');
+        await supabase.auth.signOut(); return;
       }
-      showAuthMsg('signupMsg', '가입 완료! 로그인해주세요.', 'success');
+      showMsg('signupMsg','가입 완료! 로그인해주세요.','success');
       switchAuthTab('login');
     }
 
-    async function logout() {
-      await supabase.auth.signOut();
-    }
+    async function logout() { await supabase.auth.signOut(); }
 
     // ── 시험 선택 ─────────────────────────
     async function loadTeachers() {
-      document.getElementById('teacherStep').style.display = '';
-      document.getElementById('unitStep').style.display = 'none';
-      selectedTeacherId = null;
-
       const { data } = await supabase.from('profiles').select('id, display_name').order('display_name');
       const list = document.getElementById('teacherList');
-
-      if (!data?.length) {
-        list.innerHTML = '<p class="empty">등록된 선생님이 없습니다.</p>';
-        return;
-      }
+      if (!data?.length) { list.innerHTML = '<p class="empty">등록된 선생님이 없습니다.</p>'; return; }
       list.innerHTML = data.map(t => `
-        <button class="unit-btn" onclick="selectTeacher('${t.id}', '${t.display_name.replace(/'/g,"\\'")}')">
+        <button class="unit-btn" onclick="selectTeacher('${t.id}','${t.display_name.replace(/'/g,"\\'")}')">
           👨‍🏫 ${t.display_name}
-        </button>
-      `).join('');
+        </button>`).join('');
     }
 
     async function selectTeacher(teacherId, teacherName) {
       selectedTeacherId = teacherId;
-      document.getElementById('selectedTeacherName').textContent = `— ${teacherName}`;
+      document.getElementById('selectedTeacherName').textContent = `👨‍🏫 ${teacherName} 선생님 단원 선택`;
       document.getElementById('teacherStep').style.display = 'none';
       document.getElementById('unitStep').style.display = '';
       document.getElementById('unitList').innerHTML = '<div class="spinner"></div>';
 
-      const { data } = await supabase
-        .from('problems').select('unit')
-        .eq('teacher_id', teacherId).order('unit');
-
+      const { data } = await supabase.from('problems').select('unit').eq('teacher_id', teacherId).order('unit');
       const units = [...new Set((data||[]).map(r => r.unit))];
       const list = document.getElementById('unitList');
-
       if (!units.length) { list.innerHTML = '<p class="empty">등록된 문제가 없습니다.</p>'; return; }
 
-      // 오답이 있는 단원 확인
-      const { data: wrongData } = await supabase
-        .from('problem_results')
-        .select('unit')
-        .eq('student_id', currentUser.id)
-        .eq('teacher_id', teacherId)
-        .eq('is_correct', false);
+      // 이 학생의 오답 단원 조회
+      const { data: wrongData } = await supabase.from('problem_results')
+        .select('unit').eq('student_id', currentUser.id).eq('teacher_id', teacherId).eq('is_correct', false);
       const wrongUnits = new Set((wrongData||[]).map(r => r.unit));
 
       list.innerHTML = units.map(u => `
         <div class="unit-row">
-          <button class="unit-btn" style="flex:1" onclick="startQuiz('${u.replace(/'/g,"\\'")}', 'normal')">
+          <button class="unit-btn" style="flex:1" onclick="startQuiz('${u.replace(/'/g,"\\'")}','normal')">
             📖 ${u}
           </button>
           ${wrongUnits.has(u) ? `
-          <button class="btn btn-secondary btn-sm wrong-btn" onclick="startQuiz('${u.replace(/'/g,"\\'")}', 'wrong')"
-            title="틀린 문항만 풀기">❌ 오답만</button>
-          ` : ''}
-        </div>
-      `).join('');
+          <button class="btn btn-sm wrong-btn" onclick="startQuiz('${u.replace(/'/g,"\\'")}','wrong')">
+            ❌ 오답만
+          </button>` : ''}
+        </div>`).join('');
     }
 
     function backToTeacher() {
@@ -282,16 +243,122 @@
     }
 
     function startQuiz(unit, mode) {
-      sessionStorage.setItem('studentId', currentUser.id);
+      sessionStorage.setItem('studentId',   currentUser.id);
       sessionStorage.setItem('studentName', studentProfile.name);
       sessionStorage.setItem('studentInfo', JSON.stringify(studentProfile));
       sessionStorage.setItem('selectedUnit', unit);
-      sessionStorage.setItem('teacherId', selectedTeacherId);
-      sessionStorage.setItem('quizMode', mode);
+      sessionStorage.setItem('teacherId',   selectedTeacherId);
+      sessionStorage.setItem('quizMode',    mode);
       location.href = 'quiz.html';
     }
 
-    function showAuthMsg(id, text, type) {
+    // ── 오답노트 ──────────────────────────
+    async function loadNote() {
+      const el = document.getElementById('noteContent');
+      el.innerHTML = '<div class="spinner"></div>';
+
+      const { data: results } = await supabase
+        .from('problem_results')
+        .select('problem_id, unit, teacher_id, is_correct, student_answer, submitted_at')
+        .eq('student_id', currentUser.id)
+        .order('submitted_at', { ascending: false });
+
+      if (!results?.length) {
+        el.innerHTML = '<p class="empty" style="padding:40px 0">아직 풀어본 문제가 없습니다.<br>시험을 먼저 풀어보세요!</p>';
+        return;
+      }
+
+      const teacherIds = [...new Set(results.map(r => r.teacher_id))];
+      const problemIds = [...new Set(results.map(r => r.problem_id))];
+
+      const [{ data: teachers }, { data: problems }] = await Promise.all([
+        supabase.from('profiles').select('id, display_name').in('id', teacherIds),
+        supabase.from('problems').select('id, image_url, order_number, answer, unit').in('id', problemIds),
+      ]);
+
+      const teacherMap = Object.fromEntries((teachers||[]).map(t => [t.id, t.display_name]));
+      const problemMap = Object.fromEntries((problems||[]).map(p => [p.id, p]));
+
+      // 문항별 최신 결과만 사용
+      const latest = {};
+      for (const r of results) {
+        if (!latest[r.problem_id]) latest[r.problem_id] = r;
+      }
+
+      // 선생님 → 단원별 그룹화
+      const grouped = {};
+      for (const r of Object.values(latest)) {
+        if (!grouped[r.teacher_id]) grouped[r.teacher_id] = {};
+        if (!grouped[r.teacher_id][r.unit]) grouped[r.teacher_id][r.unit] = { correct: [], wrong: [] };
+        (r.is_correct ? grouped[r.teacher_id][r.unit].correct : grouped[r.teacher_id][r.unit].wrong).push(r);
+      }
+
+      let html = '';
+      for (const [tId, units] of Object.entries(grouped)) {
+        const tName = teacherMap[tId] || '알 수 없음';
+        html += `<h3 style="margin:8px 0 12px;color:#374151;font-size:1rem;">👨‍🏫 ${tName}</h3>`;
+
+        for (const [unit, { correct, wrong }] of Object.entries(units)) {
+          const total = correct.length + wrong.length;
+          const score = Math.round((correct.length / total) * 100);
+          const barColor = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+          const chips = [...correct.map(r=>({...r,ok:true})), ...wrong.map(r=>({...r,ok:false}))]
+            .sort((a,b) => (problemMap[a.problem_id]?.order_number||0) - (problemMap[b.problem_id]?.order_number||0))
+            .map(r => {
+              const p = problemMap[r.problem_id];
+              const bg = r.is_correct === null ? '#f3f4f6' : r.ok ? '#d1fae5' : '#fee2e2';
+              const ic = r.is_correct === null ? '?' : r.ok ? '✅' : '❌';
+              return `<div style="background:${bg};border-radius:8px;padding:6px 10px;font-size:0.82rem;text-align:center;min-width:52px;">
+                <div style="font-weight:700">${p?.order_number??'?'}번</div>
+                <div>${ic}</div>
+                <div style="color:#6b7280">${r.student_answer??'-'}번</div>
+              </div>`;
+            }).join('');
+
+          const wrongImgs = wrong.map(r => {
+            const p = problemMap[r.problem_id];
+            if (!p) return '';
+            return `<div style="border:2px solid #fca5a5;border-radius:8px;overflow:hidden;">
+              <div style="background:#ef4444;color:white;font-size:0.78rem;font-weight:700;padding:4px 10px;">
+                ${p.order_number}번 | 내 답: ${r.student_answer??'-'}번 → 정답: ${p.answer??'?'}번
+              </div>
+              <img src="${p.image_url}" style="width:100%;object-fit:contain;background:#f9fafb;max-height:160px;">
+            </div>`;
+          }).join('');
+
+          html += `
+            <div class="submission-card" style="margin-bottom:14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                <div>
+                  <span class="unit-tag">${unit}</span>
+                  <span style="font-weight:700;margin-left:8px;">${correct.length}/${total} 정답 (${score}%)</span>
+                </div>
+                ${wrong.length > 0
+                  ? `<button class="btn btn-sm wrong-btn" onclick="retryWrong('${tId}','${unit.replace(/'/g,"\\'")}')">❌ 틀린 ${wrong.length}문항 다시 풀기</button>`
+                  : `<span style="color:#10b981;font-size:0.85rem;font-weight:600;">✅ 모두 정답!</span>`}
+              </div>
+              <div style="height:8px;background:#e5e7eb;border-radius:4px;margin-bottom:12px;overflow:hidden;">
+                <div style="height:100%;width:${score}%;background:${barColor};border-radius:4px;"></div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${wrong.length?'12px':'0'}">${chips}</div>
+              ${wrong.length > 0 ? `
+              <details>
+                <summary style="cursor:pointer;font-size:0.85rem;color:#1a56db;font-weight:600;margin-top:4px;">틀린 문항 이미지 보기 (${wrong.length}개)</summary>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:10px;">${wrongImgs}</div>
+              </details>` : ''}
+            </div>`;
+        }
+      }
+      el.innerHTML = html;
+    }
+
+    function retryWrong(teacherId, unit) {
+      selectedTeacherId = teacherId;
+      startQuiz(unit, 'wrong');
+    }
+
+    function showMsg(id, text, type) {
       const el = document.getElementById(id);
       el.textContent = text;
       el.className = `msg ${type} show`;
