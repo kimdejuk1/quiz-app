@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 오답노트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>📊 내 오답노트</h1>
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+      <span class="sub" id="headerName"></span>
+      <button class="btn btn-secondary btn-sm" onclick="location.href='index.html'">← 시험 선택</button>
+    </div>
+  </header>
+
+  <div class="teacher-layout">
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script>
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { location.href = 'index.html'; return; }
+
+      const { data: profile } = await supabase
+        .from('student_profiles').select('*').eq('id', session.user.id).single();
+      if (!profile) { location.href = 'index.html'; return; }
+
+      document.getElementById('headerName').textContent =
+        `${profile.grade}학년 ${profile.class_num}반 ${profile.number}번 ${profile.name}`;
+
+      // 전체 problem_results 조회
+      const { data: results } = await supabase
+        .from('problem_results')
+        .select('problem_id, unit, teacher_id, is_correct, student_answer, submitted_at')
+        .eq('student_id', session.user.id)
+        .order('submitted_at', { ascending: false });
+
+      if (!results?.length) {
+        document.getElementById('content').innerHTML =
+          '<p class="empty" style="padding:60px 0">아직 풀어본 문제가 없습니다.</p>';
+        return;
+      }
+
+      // 선생님 이름 조회
+      const teacherIds = [...new Set(results.map(r => r.teacher_id))];
+      const { data: teachers } = await supabase
+        .from('profiles').select('id, display_name').in('id', teacherIds);
+      const teacherMap = Object.fromEntries((teachers||[]).map(t => [t.id, t.display_name]));
+
+      // 문제 이미지 조회
+      const problemIds = [...new Set(results.map(r => r.problem_id))];
+      const { data: problems } = await supabase
+        .from('problems').select('id, image_url, order_number, answer, unit').in('id', problemIds);
+      const problemMap = Object.fromEntries((problems||[]).map(p => [p.id, p]));
+
+      // 선생님 → 단원별 그룹화 (최신 결과만)
+      const latestResults = {};
+      for (const r of results) {
+        const key = r.problem_id;
+        if (!latestResults[key]) latestResults[key] = r;
+      }
+
+      const grouped = {};
+      for (const r of Object.values(latestResults)) {
+        const tId = r.teacher_id;
+        const u   = r.unit;
+        if (!grouped[tId]) grouped[tId] = {};
+        if (!grouped[tId][u]) grouped[tId][u] = { correct: [], wrong: [] };
+        if (r.is_correct === true)  grouped[tId][u].correct.push(r);
+        if (r.is_correct === false) grouped[tId][u].wrong.push(r);
+      }
+
+      let html = '';
+      for (const [tId, units] of Object.entries(grouped)) {
+        const tName = teacherMap[tId] || '알 수 없음';
+        html += `<h3 style="margin:24px 0 12px;color:#374151;font-size:1rem;">👨‍🏫 ${tName}</h3>`;
+
+        for (const [unit, { correct, wrong }] of Object.entries(units)) {
+          const total    = correct.length + wrong.length;
+          const score    = Math.round((correct.length / total) * 100);
+          const barColor = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+          html += `
+            <div class="submission-card" style="margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <span class="unit-tag">${unit}</span>
+                  <span style="font-weight:700;margin-left:8px;">${correct.length}/${total} 정답 (${score}%)</span>
+                </div>
+                ${wrong.length > 0 ? `
+                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;"
+                  onclick="startWrong('${tId}','${unit.replace(/'/g,"\\'")}')">
+                  ❌ 틀린 ${wrong.length}문항 다시 풀기
+                </button>` : '<span style="color:#10b981;font-size:0.85rem;font-weight:600;">✅ 모두 정답!</span>'}
+              </div>
+
+              <!-- 점수 바 -->
+              <div style="height:8px;background:#e5e7eb;border-radius:4px;margin-bottom:14px;overflow:hidden;">
+                <div style="height:100%;width:${score}%;background:${barColor};border-radius:4px;transition:width 0.5s;"></div>
+              </div>
+
+              <!-- 문항별 결과 -->
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                ${[...correct.map(r=>({...r,ok:true})), ...wrong.map(r=>({...r,ok:false}))]
+                  .sort((a,b) => {
+                    const pa = problemMap[a.problem_id];
+                    const pb = problemMap[b.problem_id];
+                    return (pa?.order_number||0) - (pb?.order_number||0);
+                  })
+                  .map(r => {
+                    const p = problemMap[r.problem_id];
+                    const num = p?.order_number ?? '?';
+                    const bg  = r.is_correct === null ? '#f3f4f6' : r.ok ? '#d1fae5' : '#fee2e2';
+                    const ic  = r.is_correct === null ? '?' : r.ok ? '✅' : '❌';
+                    return `
+                      <div style="background:${bg};border-radius:8px;padding:6px 10px;font-size:0.82rem;text-align:center;min-width:52px;">
+                        <div style="font-weight:700">${num}번</div>
+                        <div>${ic}</div>
+                        <div style="color:#6b7280">${r.student_answer ?? '-'}번</div>
+                      </div>`;
+                  }).join('')}
+              </div>
+
+              <!-- 틀린 문항 이미지 -->
+              ${wrong.length > 0 ? `
+              <details style="margin-top:14px;">
+                <summary style="cursor:pointer;font-size:0.88rem;color:#1a56db;font-weight:600;">틀린 문항 이미지 보기</summary>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px;">
+                  ${wrong.map(r => {
+                    const p = problemMap[r.problem_id];
+                    if (!p) return '';
+                    return `
+                      <div style="border:2px solid #fca5a5;border-radius:8px;overflow:hidden;">
+                        <div style="background:#ef4444;color:white;font-size:0.8rem;font-weight:700;padding:4px 10px;">
+                          ${p.order_number}번 | 내 답: ${r.student_answer ?? '-'}번 → 정답: ${p.answer ?? '?'}번
+                        </div>
+                        <img src="${p.image_url}" style="width:100%;object-fit:contain;background:#f9fafb;max-height:180px;">
+                      </div>`;
+                  }).join('')}
+                </div>
+              </details>` : ''}
+            </div>`;
+        }
+      }
+
+      document.getElementById('content').innerHTML = html;
+    }
+
+    function startWrong(teacherId, unit) {
+      const { data: { session } } = supabase.auth.getSession().then(({ data: { session } }) => {
+        sessionStorage.setItem('studentId', session.user.id);
+        sessionStorage.setItem('teacherId', teacherId);
+        sessionStorage.setItem('selectedUnit', unit);
+        sessionStorage.setItem('quizMode', 'wrong');
+        // studentName, studentInfo는 이미 세션에 있을 수도 있지만 재확인
+        supabase.from('student_profiles').select('*').eq('id', session.user.id).single()
+          .then(({ data: p }) => {
+            if (p) {
+              sessionStorage.setItem('studentName', p.name);
+              sessionStorage.setItem('studentInfo', JSON.stringify(p));
+            }
+            location.href = 'quiz.html';
+          });
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

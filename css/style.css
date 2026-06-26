@@ -64,6 +64,19 @@ input:focus, select:focus { border-color: #1a56db; }
 .btn-danger { background: #ef4444; color: white; }
 .btn-sm { padding: 6px 14px; font-size: 0.82rem; }
 
+/* ── 단원 행 (오답 버튼 포함) ── */
+.unit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.unit-row .unit-btn { margin-bottom: 0; }
+.wrong-btn { white-space: nowrap; flex-shrink: 0; background: #fee2e2; color: #b91c1c; }
+.wrong-btn:hover { background: #fecaca; opacity: 1; }
+
+.form-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #444; }
+
 /* ── 알림 메시지 ── */
 .msg {
   padding: 10px 14px;
